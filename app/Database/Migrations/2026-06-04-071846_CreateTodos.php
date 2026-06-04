@@ -23,6 +23,10 @@ class CreateTodos extends Migration
                 'type'    => 'BOOLEAN',
                 'default' => false,
             ],
+            'position' => [
+                'type' => 'INT',
+                'default' => 0
+            ],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => true,

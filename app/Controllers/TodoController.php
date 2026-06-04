@@ -10,9 +10,33 @@ class TodoController extends BaseController
     {
         $todoModel = new TodoModel();
 
+        $filter = $this->request->getGet('filter');
+
+        $query = $todoModel;
+
+        if ($filter === 'active') {
+            $query = $query->where('completed', 0);
+        }
+
+        if ($filter === 'completed') {
+            $query = $query->where('completed', 1);
+        }
+
+        $todos = $query->findAll();
+
         return view('todos/index', [
-            'todos' => $todoModel->findAll()
+            'todos' => $todos,
+            'filter' => $filter ?? 'all',
+            'count'  => $todoModel->countAllResults(),
         ]);
+    }
+
+    public function clearCompleted()
+    {
+        $todoModel = new TodoModel();
+        $todoModel->where('completed', 1)->delete();
+
+        return redirect()->to('/');
     }
 
     public function store()
@@ -32,6 +56,10 @@ class TodoController extends BaseController
 
         $todo = $todoModel->find($id);
 
+        if (!$todo) {
+            return redirect()->to('/')->with('error', 'Tâche introuvable');
+        }
+
         $todoModel->update($id, [
             'completed' => !$todo['completed']
         ]);
@@ -41,10 +69,35 @@ class TodoController extends BaseController
 
     public function delete($id)
     {
-        $todoModel = new TodoModel();
+        $todo = new TodoModel();
+        $todo->delete($id);
 
-        $todoModel->delete($id);
+        return $this->response->setJSON(['success' => true]);
+    }
+    
+    public function toggle($id)
+    {
+        $todo = new TodoModel();
 
-        return redirect()->to('/');
+        $task = $todo->find($id);
+        if (!$task) return $this->response->setStatusCode(404);
+
+        $todo->update($id, [
+            'completed' => !$task['completed']
+        ]);
+
+        return $this->response->setJSON(['success' => true]);
+    }
+    public function reorder()
+    {
+        $todo = new TodoModel();
+
+        $items = $this->request->getJSON(true)['items'];
+
+        foreach ($items as $index => $id) {
+            $todo->update($id, ['position' => $index]);
+        }
+
+        return $this->response->setJSON(['success' => true]);
     }
 }
