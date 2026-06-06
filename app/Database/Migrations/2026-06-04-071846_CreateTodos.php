@@ -27,6 +27,11 @@ class CreateTodos extends Migration
                 'type' => 'INT',
                 'default' => 0
             ],
+            'status' => [
+                'type' => 'VARCHAR',
+                'constraint' => 20,
+                'default' => 'todo'
+            ],
             'created_at' => [
                 'type' => 'DATETIME',
                 'null' => true,

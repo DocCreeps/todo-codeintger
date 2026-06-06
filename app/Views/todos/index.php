@@ -3,241 +3,247 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Todo List</title>
+    <title>Kanban Todo Pro</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex justify-center py-10">
+<body class="bg-gray-100 min-h-screen p-6">
 
-    <div
-        x-data="todoApp()"
-        x-init="init()"
-        class="w-full max-w-2xl bg-white shadow-xl rounded-2xl p-6">
+    <div class="max-w-7xl mx-auto">
 
-        <!-- HEADER -->
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-gray-800">Todo List</h1>
+        <!-- ADD TASK -->
+        <div class="bg-white p-4 rounded-xl shadow mb-6"
+            x-data="{ title: '' }"
+            @create-task.window="async (e) => {
+
+            await fetch('/store', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ title: e.detail })
+            });
+
+            location.reload();
+         }">
+
+            <form class="flex gap-2"
+                @submit.prevent="$dispatch('create-task', title); title=''">
+
+                <input
+                    x-model="title"
+                    class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Ajouter une tâche...">
+
+                <button class="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700">
+                    + Ajouter
+                </button>
+
+            </form>
         </div>
 
-        <!-- INPUT -->
-        <form class="flex gap-2 mb-6" @submit.prevent="addTodo">
-            <input
-                x-model="newTodo"
-                name="title"
-                class="flex-1 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="Nouvelle tâche...">
+        <!-- KANBAN -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4"
+            x-data="kanban()"
+            x-init="init()">
 
-            <button class="bg-blue-600 text-white px-4 rounded-lg hover:bg-blue-700">
-                Ajouter
-            </button>
-        </form>
+            <!-- TODO -->
+            <div class="bg-white rounded-xl shadow p-3">
+                <h2 class="font-bold mb-3 text-yellow-600">🟡 À faire</h2>
 
-        <!-- LIST -->
-        <div id="todo-list" class="space-y-2">
+                <div id="todo" class="space-y-2 min-h-[200px]">
 
-            <?php foreach ($todos as $todo): ?>
+                    <?php foreach ($todos as $t): ?>
+                        <?php if (($t['status'] ?? 'todo') === 'todo'): ?>
 
-                <div
-                    class="flex items-center justify-between bg-gray-50 border rounded-lg px-4 py-3 group hover:bg-gray-100 transition"
-                    data-id="<?= $todo['id'] ?>">
+                            <?php
+                            $color = 'bg-gray-100 hover:bg-gray-200';
+                            ?>
 
-                    <!-- LEFT -->
-                    <div class="flex items-center gap-3">
+                            <div
+                                class="task flex items-center justify-between p-2 rounded shadow-sm cursor-grab active:cursor-grabbing transition group <?= $color ?>"
+                                data-id="<?= $t['id'] ?>">
 
-                        <!-- DRAG HANDLE -->
-                        <div class="cursor-move text-gray-400 hover:text-gray-600 select-none">
-                            ☰
-                        </div>
+                                <div class="flex items-center gap-2">
 
-                        <!-- STATUS DOT -->
-                        <div
-                            class="w-2.5 h-2.5 rounded-full"
-                            :class="completedIds.includes(<?= $todo['id'] ?>)
-                            ? 'bg-green-500'
-                            : 'bg-gray-300'"></div>
+                                    <!-- DRAG HANDLE -->
+                                    <div class="text-gray-400 group-hover:text-gray-600 select-none cursor-grab active:cursor-grabbing">
+                                        ☰
+                                    </div>
 
-                        <!-- TITLE -->
-                        <span
-                            class="cursor-pointer select-none transition"
-                            :class="completedIds.includes(<?= $todo['id'] ?>)
-                            ? 'line-through text-gray-400'
-                            : 'text-gray-800'"
-                            @click="toggle(<?= $todo['id'] ?>)">
-                            <?= esc($todo['title']) ?>
-                        </span>
+                                    <span><?= esc($t['title']) ?></span>
 
-                    </div>
+                                </div>
 
-                    <!-- ACTIONS -->
-                    <div class="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition">
+                            </div>
 
-                        <button
-                            @click="toggle(<?= $todo['id'] ?>)"
-                            class="text-xs px-2 py-1 rounded bg-gray-200 hover:bg-gray-300">
-                            <?= $todo['completed'] ? '↩' : '✓' ?>
-                        </button>
-
-                        <button
-                            @click="openModal(<?= $todo['id'] ?>)"
-                            class="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200">
-                            🗑
-                        </button>
-
-                    </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
 
                 </div>
-
-            <?php endforeach; ?>
-
-            <?php if (empty($todos)): ?>
-                <div class="text-center text-gray-400 py-10">
-                    Aucune tâche
-                </div>
-            <?php endif; ?>
-
-        </div>
-
-        <!-- MODAL DELETE -->
-        <div
-            x-show="modalOpen"
-            x-transition
-            class="fixed inset-0 bg-black/40 flex items-center justify-center">
-            <div class="bg-white p-6 rounded-lg w-80 shadow-xl">
-
-                <p class="mb-4 text-gray-700">
-                    Supprimer cette tâche ?
-                </p>
-
-                <div class="flex justify-end gap-2">
-                    <button
-                        @click="modalOpen=false"
-                        class="px-3 py-1 rounded bg-gray-200">
-                        Annuler
-                    </button>
-
-                    <button
-                        @click="deleteTodo()"
-                        class="px-3 py-1 rounded bg-red-600 text-white">
-                        Supprimer
-                    </button>
-                </div>
-
             </div>
-        </div>
 
-        <!-- TOAST -->
-        <div
-            x-show="toast.show"
-            x-transition
-            class="fixed bottom-5 right-5 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg">
-            <div class="flex items-center gap-2">
-                <span class="text-green-400">✔</span>
-                <span x-text="toast.message"></span>
+            <!-- DOING -->
+            <div class="bg-white rounded-xl shadow p-3">
+                <h2 class="font-bold mb-3 text-blue-600">🔵 En cours</h2>
+
+                <div id="doing" class="space-y-2 min-h-[200px]">
+
+                    <?php foreach ($todos as $t): ?>
+                        <?php if (($t['status'] ?? '') === 'doing'): ?>
+
+                            <?php $color = 'bg-blue-100 hover:bg-blue-200'; ?>
+
+                            <div
+                                class="task flex items-center justify-between p-2 rounded shadow-sm cursor-grab active:cursor-grabbing transition group <?= $color ?>"
+                                data-id="<?= $t['id'] ?>">
+
+                                <div class="flex items-center gap-2">
+
+                                    <div class="text-gray-400 group-hover:text-gray-600 select-none cursor-grab active:cursor-grabbing">
+                                        ☰
+                                    </div>
+
+                                    <span><?= esc($t['title']) ?></span>
+
+                                </div>
+
+                            </div>
+
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+
+                </div>
             </div>
+
+            <!-- DONE -->
+            <div class="bg-white rounded-xl shadow p-3">
+                <h2 class="font-bold mb-3 text-green-600">🟢 Terminé</h2>
+
+                <div id="done" class="space-y-2 min-h-[200px]">
+
+                    <?php foreach ($todos as $t): ?>
+                        <?php if (($t['status'] ?? '') === 'done'): ?>
+
+                            <?php $color = 'bg-green-100 hover:bg-green-200'; ?>
+
+                            <div
+                                class="task flex items-center justify-between p-2 rounded shadow-sm cursor-grab active:cursor-grabbing transition group <?= $color ?>"
+                                data-id="<?= $t['id'] ?>">
+
+                                <div class="flex items-center gap-2">
+
+                                    <div class="text-gray-400 group-hover:text-gray-600 select-none cursor-grab active:cursor-grabbing">
+                                        ☰
+                                    </div>
+
+                                    <span class="line-through text-gray-600">
+                                        <?= esc($t['title']) ?>
+                                    </span>
+
+                                </div>
+
+                            </div>
+
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+
+                </div>
+            </div>
+
+            <!-- ARCHIVED -->
+            <div class="bg-white rounded-xl shadow p-3">
+                <h2 class="font-bold mb-3 text-gray-600">⚫ Archivées</h2>
+
+                <div id="archived" class="space-y-2 min-h-[200px]">
+
+                    <?php foreach ($todos as $t): ?>
+                        <?php if (($t['status'] ?? '') === 'archived'): ?>
+
+                            <?php $color = 'bg-gray-200 opacity-70'; ?>
+
+                            <div
+                                class="task flex items-center justify-between p-2 rounded shadow-sm cursor-grab active:cursor-grabbing transition group <?= $color ?>"
+                                data-id="<?= $t['id'] ?>">
+
+                                <div class="flex items-center gap-2">
+
+                                    <div class="text-gray-400 group-hover:text-gray-600 select-none cursor-grab active:cursor-grabbing">
+                                        ☰
+                                    </div>
+
+                                    <span><?= esc($t['title']) ?></span>
+
+                                </div>
+
+                                <button
+                                    class="text-xs text-blue-600"
+                                    @click="restore(<?= $t['id'] ?>)">
+                                    restore
+                                </button>
+
+                            </div>
+
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+
+                </div>
+            </div>
+
         </div>
 
     </div>
 
     <!-- SCRIPT -->
     <script>
-        function todoApp() {
+        function kanban() {
             return {
-                newTodo: '',
-                modalOpen: false,
-                deleteId: null,
-
-                completedIds: [],
-                toast: {
-                    show: false,
-                    message: ''
-                },
-
                 init() {
-                    new Sortable(document.getElementById('todo-list'), {
-                        animation: 200,
-                        handle: '.cursor-move',
 
-                        onStart: (evt) => {
-                            evt.item.classList.add('opacity-50');
-                        },
+                    ['todo', 'doing', 'done', 'archived'].forEach((col) => {
 
-                        onEnd: async (evt) => {
-                            evt.item.classList.remove('opacity-50');
+                        const el = document.getElementById(col);
+                        if (!el) return;
 
-                            const ids = [...document.querySelectorAll('#todo-list [data-id]')]
-                                .map(el => el.dataset.id);
+                        new Sortable(el, {
+                            group: 'kanban',
+                            animation: 150,
 
-                            await fetch('/todo/reorder', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({
-                                    items: ids
-                                })
-                            });
+                            onStart(evt) {
+                                evt.item.classList.add('opacity-50', 'scale-105');
+                            },
 
-                            this.notify('Ordre mis à jour ✔');
-                        }
+                            onEnd(evt) {
+                                evt.item.classList.remove('opacity-50', 'scale-105');
+                            },
+
+                            onAdd: async (evt) => {
+
+                                const id = evt.item.dataset.id;
+                                const status = evt.to.id;
+
+                                await fetch('/todo/move/' + id, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        status
+                                    })
+                                });
+                            }
+                        });
+
                     });
                 },
 
-                async toggle(id) {
-                    const el = document.querySelector(`[data-id="${id}"]`);
-
-                    el.classList.add('scale-[1.01]', 'transition');
-
-                    setTimeout(() => el.classList.remove('scale-[1.01]'), 150);
-
-                    if (this.completedIds.includes(id)) {
-                        this.completedIds = this.completedIds.filter(i => i !== id);
-                    } else {
-                        this.completedIds.push(id);
-                    }
-
-                    await fetch('/todo/toggle/' + id, {
+                async restore(id) {
+                    await fetch('/todo/restore/' + id, {
                         method: 'POST'
                     });
 
-                    this.notify('Statut mis à jour ✔');
-                },
-
-                openModal(id) {
-                    this.deleteId = id;
-                    this.modalOpen = true;
-                },
-
-                async deleteTodo() {
-                    await fetch('/todo/delete/' + this.deleteId, {
-                        method: 'DELETE'
-                    });
-
-                    document.querySelector(`[data-id="${this.deleteId}"]`).remove();
-
-                    this.modalOpen = false;
-                    this.notify('Tâche supprimée 🗑');
-                },
-
-                async addTodo() {
-                    await fetch('/store', {
-                        method: 'POST',
-                        body: new FormData(document.querySelector('form'))
-                    });
-
-                    this.notify('Ajouté ✔');
                     location.reload();
-                },
-
-                notify(message) {
-                    this.toast.message = message;
-                    this.toast.show = true;
-
-                    setTimeout(() => {
-                        this.toast.show = false;
-                    }, 2000);
                 }
             }
         }

@@ -15,6 +15,8 @@ class TodoModel extends Model
     protected $allowedFields = [
         'title',
         'completed',
+        'status',
+        'position'       
     ];
 
     protected $useTimestamps = true;

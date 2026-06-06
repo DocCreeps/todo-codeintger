@@ -10,93 +10,99 @@ class TodoController extends BaseController
     {
         $todoModel = new TodoModel();
 
-        $filter = $this->request->getGet('filter');
-
-        $query = $todoModel;
-
-        if ($filter === 'active') {
-            $query = $query->where('completed', 0);
-        }
-
-        if ($filter === 'completed') {
-            $query = $query->where('completed', 1);
-        }
-
-        $todos = $query->findAll();
+        $todos = $todoModel
+            ->orderBy('position', 'ASC')
+            ->findAll();
 
         return view('todos/index', [
             'todos' => $todos,
-            'filter' => $filter ?? 'all',
-            'count'  => $todoModel->countAllResults(),
+            'count' => $todoModel->countAll(),
         ]);
-    }
-
-    public function clearCompleted()
-    {
-        $todoModel = new TodoModel();
-        $todoModel->where('completed', 1)->delete();
-
-        return redirect()->to('/');
     }
 
     public function store()
-    {
-        $todoModel = new TodoModel();
+{
+    $todoModel = new TodoModel();
 
-        $todoModel->insert([
-            'title' => $this->request->getPost('title'),
-        ]);
+    $title = $this->request->getPost('title')
+        ?? $this->request->getJSON(true)['title']
+        ?? null;
 
-        return redirect()->to('/');
+    if (!$title) {
+        return $this->response->setStatusCode(400);
     }
 
-    public function complete($id)
+    $todoModel->insert([
+        'title' => $title,
+        'status' => 'todo',
+        'position' => 0
+    ]);
+
+    return $this->response->setJSON(['success' => true]);
+}
+
+    /**
+     * MOVE BETWEEN COLUMNS (KANBAN CORE)
+     */
+    public function move($id)
     {
         $todoModel = new TodoModel();
 
-        $todo = $todoModel->find($id);
+        $status = $this->request->getJSON(true)['status'] ?? null;
 
-        if (!$todo) {
-            return redirect()->to('/')->with('error', 'Tâche introuvable');
+        if (!$status) {
+            return $this->response->setStatusCode(400);
         }
 
         $todoModel->update($id, [
-            'completed' => !$todo['completed']
-        ]);
-
-        return redirect()->to('/');
-    }
-
-    public function delete($id)
-    {
-        $todo = new TodoModel();
-        $todo->delete($id);
-
-        return $this->response->setJSON(['success' => true]);
-    }
-    
-    public function toggle($id)
-    {
-        $todo = new TodoModel();
-
-        $task = $todo->find($id);
-        if (!$task) return $this->response->setStatusCode(404);
-
-        $todo->update($id, [
-            'completed' => !$task['completed']
+            'status' => $status
         ]);
 
         return $this->response->setJSON(['success' => true]);
     }
+
+    /**
+     * REORDER INSIDE COLUMN
+     */
     public function reorder()
     {
-        $todo = new TodoModel();
+        $todoModel = new TodoModel();
 
-        $items = $this->request->getJSON(true)['items'];
+        $items = $this->request->getJSON(true)['items'] ?? [];
 
         foreach ($items as $index => $id) {
-            $todo->update($id, ['position' => $index]);
+            $todoModel->update($id, [
+                'position' => $index
+            ]);
         }
+
+        return $this->response->setJSON(['success' => true]);
+    }
+
+    /**
+     * SOFT DELETE = ARCHIVE
+     */
+    public function archive($id)
+    {
+        $todoModel = new TodoModel();
+
+        $todoModel->update($id, [
+            'status' => 'archived'
+        ]);
+
+        return $this->response->setJSON(['success' => true]);
+    }
+
+    /**
+     * RESTORE FROM ARCHIVE
+     */
+    public function restore($id)
+    {
+        $todoModel = new TodoModel();
+
+        $todoModel->update($id, [
+            'status' => 'todo'
+        ]);
 
         return $this->response->setJSON(['success' => true]);
     }
